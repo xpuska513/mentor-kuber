@@ -1,0 +1,149 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  labels:
+    app: elasticsearch
+data:
+  elasticsearch.yml: |
+    cluster.name: my-cool-cluster-i-guess
+    node.name: node-1
+    path.data: /usr/share/elasticsearch/data
+    http:
+      host: 0.0.0.0
+      port: 9200
+    transport.host: 127.0.0.1
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      serviceAccountName: elasticsearch
+      initContainers:
+      - name: set-vm-max-map-count
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ['sysctl', '-w', 'vm.max_map_count=262144']
+        securityContext:
+          privileged: true
+      - name: volume-mount-hack
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "chown -R 1000:100 /usr/share/elasticsearch/data"]
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.0.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ES_JAVA_OPTS
+          value: -Xms1024m -Xmx1024m
+        ports:
+        - containerPort: 9200
+        resources:
+          limits:
+            memory: "2147483648"
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/elasticsearch/elasticsearch.yml
+          subPath: elasticsearch.yml
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+        restartPolicy: Always
+      volumes:
+      - name: config
+        configMap:
+          name: elasticsearch-config
+      - name: data
+        hostPath:
+          path: /opt/elk_data/elasticsearch
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+spec:
+  type: NodePort
+  ports:
+  - name: "api"
+    port: 9200
+    targetPort: 9200
+  selector:
+    app: elasticsearch
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-config
+  labels:
+    app: kibana
+data:
+  kibana.yml: |
+    server:
+      port: 127.0.0.1:5601
+    elasticsearch.url: "http://elasticsearch:9200"
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: kibana
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana-oss:6.0.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: ELASTICSEARCH_PASSWORD
+          value: changeme
+        ports:
+        - containerPort: 5601
+        resources: {}
+        volumeMounts:
+        - name: config
+          mountPath: /usr/share/kibana/kibana.yml
+          subPath: kibana.yml
+      restartPolicy: Always
+      volumes:
+      - name: config
+        configMap:
+          name: kibana-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  labels:
+    app: kibana
+spec:
+  type: NodePort
+  ports:
+  - name: "ui"
+    port: 5601
+    targetPort: 5601
+  selector:
+    app: kibana
+

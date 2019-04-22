@@ -1,0 +1,128 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: database
+  name: database
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+      - env:
+        - name: MYSQL_DATABASE
+          value: petclinic
+        - name: MYSQL_PASSWORD
+          value: petclinic
+        - name: MYSQL_ROOT_PASSWORD
+          value: petclinic
+        - name: MYSQL_USER
+          value: petclinic
+        image: mysql:latest
+        name: database
+        ports:
+        - containerPort: 3306
+        resources: {}
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: database-claim0
+      restartPolicy: Always
+      volumes:
+      - name: database-claim0
+        hostPath:
+          path: /var/lib/mysql
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: database
+  name: database
+spec:
+  ports:
+  - name: "3306"
+    port: 3306
+    targetPort: 3306
+  selector:
+    app: database
+status:
+  loadBalancer: {}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: petclinic
+spec:
+  replicas: 4
+  template:
+    metadata:
+      labels:
+        editor: vscode
+        app: petclinic
+    spec:
+      containers:
+      - name: petclinic
+        image: xpuska/tomcat:9
+        ports:
+          containerPort: 8080
+        volumeMounts:
+        - name: logs
+          mountPath: /usr/share/tomcat/logs
+      - name: filebeat
+        image: xpuska/filebeat:latest
+        ports:
+          containerPort: 5044
+        volumeMounts:
+        - name: fl-config
+          mountPath: /etc/filebeat/filebeat.yml
+        - name: logs
+          mountPath: /var/log/tomcat
+      volumes:
+      - name: logs
+        hostPath:
+          Path: /var/log/tomcat
+      - name: fl-config
+        configMap:
+          name: filebeat-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name:  petclinic-svc
+spec:
+  selector:
+    app:  petclinic
+  type:  NodePort
+  ports:  
+  - port:  8080
+    targetPort:  8080
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name:  filebeat-svc
+spec:
+  selector:
+    app:  filebeat
+  type:  NodePort
+  ports:
+  - port:  5044
+    targetPort:  5044
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name:  logstash-svc
+spec:
+  selector:
+    app:  logstash
+  type:  NodePort
+  ports:
+  - port:  5555
+    targetPort:  8080
