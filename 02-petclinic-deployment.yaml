@@ -1,3 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  labels:
+    app: filebeat
+data:
+  filebeat.yml: |
+    filebeat.inputs:
+    - type: log
+      enabled: true
+      paths:
+        - /var/log/tomcat/*.log
+        - /var/log/tomcat/*.txt
+
+---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
@@ -23,7 +39,7 @@ spec:
           value: petclinic
         - name: MYSQL_USER
           value: petclinic
-        image: mysql:latest
+        image: mysql:5.7
         name: database
         ports:
         - containerPort: 3306
@@ -75,9 +91,7 @@ spec:
         - name: logs
           mountPath: /usr/share/tomcat/logs
       - name: filebeat
-        image: xpuska/filebeat:latest
-        ports:
-          containerPort: 5044
+        image: docker.elastic.co/beats/filebeat:7.0.0
         volumeMounts:
         - name: fl-config
           mountPath: /etc/filebeat/filebeat.yml
@@ -101,28 +115,4 @@ spec:
   type:  NodePort
   ports:  
   - port:  8080
-    targetPort:  8080
----
-kind: Service
-apiVersion: v1
-metadata:
-  name:  filebeat-svc
-spec:
-  selector:
-    app:  filebeat
-  type:  NodePort
-  ports:
-  - port:  5044
-    targetPort:  5044
----
-kind: Service
-apiVersion: v1
-metadata:
-  name:  logstash-svc
-spec:
-  selector:
-    app:  logstash
-  type:  NodePort
-  ports:
-  - port:  5555
     targetPort:  8080

@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  labels:
+    app: logstash
+data:
+  input.conf: |
+    input {
+      beats {
+         port => 5044
+      }
+    }
+    output {
+      elasticsearch {
+        hosts => ["http://elasticsearch:9200"]
+        index => "tomcat-logs"
+      }
+    }
+
+
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: logstash
+spec:
+  replicas: 4
+  template:
+    metadata:
+      labels:
+        editor: vscode
+        app: logstash
+    spec:
+      containers:
+      - name: logstash
+        image: docker.elastic.co/logstash/logstash:7.0.0
+        volumeMounts:
+        - name: logstash-config
+          mountPath: /etc/logstash/filebeat.yml
+      volumes:
+      - name: logstash-config
+        configMap:
+          name: logstash-config
