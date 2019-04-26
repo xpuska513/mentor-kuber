@@ -10,6 +10,9 @@ data:
     cluster.name: my-cool-cluster-i-guess
     node.name: node-1
     path.data: /usr/share/elasticsearch/data
+    discovery.zen.minimum_master_nodes: 1
+    discovery.type: single-node
+    es.enforce.bootstrap.checks: false
     http:
       host: 0.0.0.0
       port: 9200
@@ -28,7 +31,6 @@ spec:
       labels:
         app: elasticsearch
     spec:
-      serviceAccountName: elasticsearch
       initContainers:
       - name: set-vm-max-map-count
         image: busybox
@@ -45,23 +47,20 @@ spec:
           mountPath: /usr/share/elasticsearch/data
       containers:
       - name: elasticsearch
-        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.0.0
-        imagePullPolicy: IfNotPresent
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.0.0
         env:
         - name: ES_JAVA_OPTS
           value: -Xms1024m -Xmx1024m
+        - name: discovery.type
+          value: single-node
         ports:
         - containerPort: 9200
-        resources:
-          limits:
-            memory: "2147483648"
         volumeMounts:
         - name: config
           mountPath: /usr/share/elasticsearch/elasticsearch.yml
           subPath: elasticsearch.yml
         - name: data
           mountPath: /usr/share/elasticsearch/data
-        restartPolicy: Always
       volumes:
       - name: config
         configMap:
@@ -114,7 +113,7 @@ spec:
     spec:
       containers:
       - name: kibana
-        image: docker.elastic.co/kibana/kibana-oss:6.0.0
+        image: docker.elastic.co/kibana/kibana-oss:7.0.0
         imagePullPolicy: IfNotPresent
         env:
         - name: ELASTICSEARCH_PASSWORD
