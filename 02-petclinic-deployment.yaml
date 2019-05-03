@@ -67,6 +67,7 @@ metadata:
 data:
   initdb.sql: |
     GRANT ALL PRIVILEGES ON petclinic.* TO 'root'@'%' IDENTIFIED BY 'petclinic';
+    GRANT ALL PRIVILEGES ON petclinic.* TO petclinic@'%' WITH MAX_USER_CONNECTIONS 10;
 
 ---
 apiVersion: extensions/v1beta1
@@ -84,10 +85,10 @@ spec:
       labels:
         app: petclinic
     spec:
-      securityContext:
-        sysctls:
-        - name: net.ipv6.conf.all.disable_ipv6
-          value: "1"
+      # securityContext:
+      #   sysctls:
+      #   - name: net.ipv6.conf.all.disable_ipv6
+      #     value: "1"
       containers:
       - env:
         - name: MYSQL_DATABASE
