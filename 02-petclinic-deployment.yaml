@@ -22,6 +22,47 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: mysql-slave-config
+  labels:
+    app: petclinic
+data:
+  mysqld.cnf: |
+    # Copyright (c) 2014, 2016, Oracle and/or its affiliates. All rights reserved.
+    #
+    # This program is free software; you can redistribute it and/or modify
+    # it under the terms of the GNU General Public License as published by
+    # the Free Software Foundation; version 2 of the License.
+    #
+    # This program is distributed in the hope that it will be useful,
+    # but WITHOUT ANY WARRANTY; without even the implied warranty of
+    # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    # GNU General Public License for more details.
+    #
+    # You should have received a copy of the GNU General Public License
+    # along with this program; if not, write to the Free Software
+    # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
+
+    #
+    # The MySQL  Server configuration file.
+    #
+    # For explanations see
+    # http://dev.mysql.com/doc/mysql/en/server-system-variables.html
+
+    [mysqld]
+    pid-file	= /var/run/mysqld/mysqld.pid
+    socket		= /var/run/mysqld/mysqld.sock
+    datadir		= /var/lib/mysql
+    #log-error	= /var/log/mysql/error.log
+    # By default we only accept connections from localhost
+    bind-address	= 0.0.0.0
+    # Disabling symbolic-links is recommended to prevent assorted security risks
+    symbolic-links=0
+    server-id=2564
+    log-bin
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: mysql-config
   labels:
     app: petclinic
@@ -57,6 +98,8 @@ data:
     bind-address	= 0.0.0.0
     # Disabling symbolic-links is recommended to prevent assorted security risks
     symbolic-links=0
+    server-id=1
+    log-bin
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -68,6 +111,21 @@ data:
   initdb.sql: |
     GRANT ALL PRIVILEGES ON petclinic.* TO 'root'@'%' IDENTIFIED BY 'petclinic';
     GRANT ALL PRIVILEGES ON petclinic.* TO petclinic@'%' WITH MAX_USER_CONNECTIONS 10;
+    CREATE USER 'petclinic-replica'@'%' IDENTIFIED BY 'petclinic' ;
+    GRANT REPLICATION SLAVE ON petclinic.* TO 'petclinic-replica'@'%' IDENTIFIED BY 'petclinic' ;
+    FLUSH PRIVILEGES ;
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slave-init
+  labels:
+    app: petclinic
+data:
+  initdb.sql: |
+    STOP SLAVE;
+    CHANGE MASTER TO master_host='petclinic-master', master_user='petclinic-slave', master_password='petclinic' ;
+    START SLAVE;
 
 ---
 apiVersion: extensions/v1beta1
@@ -130,6 +188,66 @@ spec:
           name: mysql-config
 status: {}
 ---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: petclinic
+  name: petclinic-db-slave
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: petclinic
+    spec:
+      # securityContext:
+      #   sysctls:
+      #   - name: net.ipv6.conf.all.disable_ipv6
+      #     value: "1"
+      containers:
+      - env:
+        - name: MYSQL_DATABASE
+          value: petclinic
+        - name: MYSQL_PASSWORD
+          value: petclinic
+        - name: MYSQL_ROOT_PASSWORD
+          value: petclinic
+        - name: MYSQL_USER
+          value: petclinic
+        image: mysql:5.7
+        name: petclinic-db
+        ports:
+        - containerPort: 3306
+        readinessProbe:
+          exec:
+            command: ["mysql", "-h", "127.0.0.1","-ppetclinic", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /var/lib/mysql
+          name: database-claim0
+        - mountPath: /docker-entrypoint-initdb.d
+          name: init-base
+        - mountPath: /etc/mysql/mysql.conf.d/mysqld.cnf
+          subPath: mysqld.cnf
+          name: mysql-config
+      restartPolicy: Always
+      volumes:
+      - name: database-claim0
+        hostPath:
+          path: /var/lib/mysql-slave
+      - name: init-base
+        configMap:
+          name: slave-init
+      - name: mysql-config
+        configMap:
+          name: mysql-slave-config
+status: {}
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -143,22 +261,74 @@ spec:
   selector:
     app: petclinic
   type: NodePort
+# ---
+# apiVersion: extensions/v1beta1
+# kind: Deployment
+# metadata:
+#   name: petclinic
+#   labels:
+#     app: petclinic
+# spec:
+#   replicas: 2
+#   template:
+#     metadata:
+#       labels:
+#         editor: vscode
+#         app: petclinic
+#     spec:
+#       initContainers:
+#       - name: check-connection
+#         image: busybox
+#         command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
+#       - name: volume-mount-hack
+#         image: busybox
+#         imagePullPolicy: IfNotPresent
+#         command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
+#         volumeMounts:
+#         - name: logs
+#           mountPath: /var/log/tomcat
+#       containers:
+#       - name: petclinic
+#         image: xpuska/petclinic:latest
+#         ports:
+#         - containerPort: 8080
+#         volumeMounts:
+#         - name: logs
+#           mountPath: /opt/tomcat/logs
+#       - name: filebeat
+#         image: docker.elastic.co/beats/filebeat:7.0.0
+#         volumeMounts:
+#         - name: fl-config
+#           mountPath: /usr/share/filebeat/filebeat.yml
+#           subPath: filebeat.yml
+#         - name: logs
+#           mountPath: /var/log/tomcat
+#       volumes:
+#       - name: logs
+#         hostPath:
+#           path: /var/log/tomcat
+#       - name: fl-config
+#         configMap:
+#           name: filebeat-config
 ---
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: petclinic
   labels:
     app: petclinic
 spec:
-  replicas: 1
+  selector:
+    matchLabels:
+      app: petclinic
+  serviceName: petclinic
+  replicas: 2
   template:
     metadata:
       labels:
-        editor: vscode
         app: petclinic
-    spec:
-      initContainers:
+  spec:
+    initContainers:
       - name: check-connection
         image: busybox
         command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
@@ -169,29 +339,22 @@ spec:
         volumeMounts:
         - name: logs
           mountPath: /var/log/tomcat
-      containers:
-      - name: petclinic
-        image: xpuska/petclinic:latest
-        ports:
-        - containerPort: 8080
-        volumeMounts:
-        - name: logs
-          mountPath: /opt/tomcat/logs
-      - name: filebeat
-        image: docker.elastic.co/beats/filebeat:7.0.0
-        volumeMounts:
-        - name: fl-config
-          mountPath: /usr/share/filebeat/filebeat.yml
-          subPath: filebeat.yml
-        - name: logs
-          mountPath: /var/log/tomcat
-      volumes:
+    containers:
+    - name: petclinic
+      image: xpuska/petclinic:latest
+      ports:
+      - containerPort: 8080
+      volumeMounts:
       - name: logs
-        hostPath:
-          path: /var/log/tomcat
-      - name: fl-config
-        configMap:
-          name: filebeat-config
+        mountPath: /opt/tomcat/logs
+volumeClaimTemplate:
+- metadata:
+    name: logs
+  spec:
+    accessModes: ["ReadWriteOnce"]
+    resources:
+      requests:
+        storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
