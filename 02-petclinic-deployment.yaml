@@ -1,4 +1,20 @@
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: petclinic-pv
+  labels:
+    app: petclinic
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Recycle
+  hostPath:
+    path: /var/log/tomcat
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: filebeat-config
@@ -347,7 +363,7 @@ spec:
       volumeMounts:
       - name: logs
         mountPath: /opt/tomcat/logs
-volumeClaimTemplate:
+volumeClaimTemplates:
 - metadata:
     name: logs
   spec:
