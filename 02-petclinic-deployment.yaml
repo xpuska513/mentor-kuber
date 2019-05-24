@@ -343,34 +343,34 @@ spec:
     metadata:
       labels:
         app: petclinic
-  spec:
-    initContainers:
-      - name: check-connection
-        image: busybox
-        command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
-      - name: volume-mount-hack
-        image: busybox
-        imagePullPolicy: IfNotPresent
-        command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
+    spec:
+      initContainers:
+        - name: check-connection
+          image: busybox
+          command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
+        - name: volume-mount-hack
+          image: busybox
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
+          volumeMounts:
+          - name: logs
+            mountPath: /var/log/tomcat
+      containers:
+      - name: petclinic
+        image: xpuska/petclinic:latest
+        ports:
+        - containerPort: 8080
         volumeMounts:
         - name: logs
-          mountPath: /var/log/tomcat
-    containers:
-    - name: petclinic
-      image: xpuska/petclinic:latest
-      ports:
-      - containerPort: 8080
-      volumeMounts:
-      - name: logs
-        mountPath: /opt/tomcat/logs
-  volumeClaimTemplates:
-  - metadata:
-      name: logs
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 2Gi
+          mountPath: /opt/tomcat/logs
+    volumeClaimTemplates:
+    - metadata:
+        name: logs
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
