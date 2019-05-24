@@ -363,14 +363,14 @@ spec:
         volumeMounts:
         - name: logs
           mountPath: /opt/tomcat/logs
-    volumeClaimTemplates:
-    - metadata:
-        name: logs
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 2Gi
+  volumeClaimTemplates:
+  - metadata:
+      name: logs
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
