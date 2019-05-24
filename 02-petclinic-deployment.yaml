@@ -371,16 +371,16 @@ spec:
         volumeMounts:
         - name: logs-pvc
           mountPath: /opt/tomcat/logs
-    volumeClaimTemplates:
-    - metadata:
-        name: logs-pvc
-        annotations:
-          volume.beta.kubernetes.io/storage-class: thin-disk
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 2Gi
+  volumeClaimTemplates:
+  - metadata:
+      name: logs-pvc
+      annotations:
+        volume.beta.kubernetes.io/storage-class: thin-disk
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
