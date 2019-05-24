@@ -15,6 +15,7 @@ spec:
   capacity:
     storage: 10Gi
   volumeMode: Filesystem
+  storageClassName: local-storage
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Recycle
