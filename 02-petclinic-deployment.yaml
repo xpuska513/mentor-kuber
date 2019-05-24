@@ -1,3 +1,11 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: thin-disk
+provisioner: kubernetes.io/vsphere-volume
+parameters:
+    diskformat: thin
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -363,14 +371,16 @@ spec:
         volumeMounts:
         - name: logs-pvc
           mountPath: /opt/tomcat/logs
-        volumeClaimTemplates:
-        - metadata:
-            name: logs-pvc
-          spec:
-            accessModes: ["ReadWriteOnce"]
-            resources:
-              requests:
-                storage: 2Gi
+    volumeClaimTemplates:
+    - metadata:
+        name: logs-pvc
+        annotations:
+          volume.beta.kubernetes.io/storage-class: thin-disk
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
