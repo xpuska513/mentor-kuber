@@ -360,7 +360,7 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
           volumeMounts:
-          - name: logs
+          - name: logs-pvc
             mountPath: /var/log/tomcat
       containers:
       - name: petclinic
