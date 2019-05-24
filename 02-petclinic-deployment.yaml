@@ -1,16 +1,3 @@
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: myclaim
-spec:
-  accessModes:
-    - ReadWriteMany
-  volumeMode: Filesystem
-  resources:
-    requests:
-      storage: 8Gi
-  selector:
-    app: petclinic
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -27,6 +14,22 @@ spec:
   persistentVolumeReclaimPolicy: Recycle
   hostPath:
     path: /var/log/tomcat
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  app:
+    petclinic
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  selector:
+    name: petclinic-pv
 ---
 apiVersion: v1
 kind: ConfigMap
