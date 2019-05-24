@@ -326,18 +326,21 @@ spec:
         volumeMounts:
         - name: logs
           mountPath: /opt/tomcat/logs
-      # - name: filebeat
-      #   image: docker.elastic.co/beats/filebeat:7.0.0
-      #   volumeMounts:
-      #   - name: fl-config
-      #     mountPath: /usr/share/filebeat/filebeat.yml
-      #     subPath: filebeat.yml
-      #   - name: logs
-      #     mountPath: /var/log/tomcat
+      - name: filebeat
+        image: docker.elastic.co/beats/filebeat:7.0.0
+        volumeMounts:
+        - name: fl-config
+          mountPath: /usr/share/filebeat/filebeat.yml
+          subPath: filebeat.yml
+        - name: logs
+          mountPath: /var/log/tomcat
       volumes:
       - name: logs
         persistentVolumeClaim:
           claimName: myclaim
+      - name: fl-config
+        configMap:
+          name: filebeat-config
 # ---
 # apiVersion: apps/v1
 # kind: StatefulSet
