@@ -1,9 +1,16 @@
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
-  name: local-storage
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteMany
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  selector:
+    app: petclinic
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -15,7 +22,6 @@ spec:
   capacity:
     storage: 10Gi
   volumeMode: Filesystem
-  storageClassName: local-storage
   accessModes:
     - ReadWriteMany
   persistentVolumeReclaimPolicy: Recycle
@@ -285,102 +291,99 @@ spec:
   selector:
     app: petclinic
   type: NodePort
-# ---
-# apiVersion: extensions/v1beta1
-# kind: Deployment
-# metadata:
-#   name: petclinic
-#   labels:
-#     app: petclinic
-# spec:
-#   replicas: 2
-#   template:
-#     metadata:
-#       labels:
-#         editor: vscode
-#         app: petclinic
-#     spec:
-#       initContainers:
-#       - name: check-connection
-#         image: busybox
-#         command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
-#       - name: volume-mount-hack
-#         image: busybox
-#         imagePullPolicy: IfNotPresent
-#         command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
-#         volumeMounts:
-#         - name: logs
-#           mountPath: /var/log/tomcat
-#       containers:
-#       - name: petclinic
-#         image: xpuska/petclinic:latest
-#         ports:
-#         - containerPort: 8080
-#         volumeMounts:
-#         - name: logs
-#           mountPath: /opt/tomcat/logs
-#       - name: filebeat
-#         image: docker.elastic.co/beats/filebeat:7.0.0
-#         volumeMounts:
-#         - name: fl-config
-#           mountPath: /usr/share/filebeat/filebeat.yml
-#           subPath: filebeat.yml
-#         - name: logs
-#           mountPath: /var/log/tomcat
-#       volumes:
-#       - name: logs
-#         hostPath:
-#           path: /var/log/tomcat
-#       - name: fl-config
-#         configMap:
-#           name: filebeat-config
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: extensions/v1beta1
+kind: Deployment
 metadata:
   name: petclinic
   labels:
     app: petclinic
 spec:
-  selector:
-    matchLabels:
-      app: petclinic
-  serviceName: petclinic
-  replicas: 4
+  replicas: 2
   template:
     metadata:
       labels:
+        editor: vscode
         app: petclinic
     spec:
       initContainers:
-        - name: check-connection
-          image: busybox
-          command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
-        - name: volume-mount-hack
-          image: busybox
-          imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
-          volumeMounts:
-          - name: logs-pvc
-            mountPath: /var/log/tomcat
+      - name: check-connection
+        image: busybox
+        command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
+      - name: volume-mount-hack
+        image: busybox
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/tomcat
       containers:
       - name: petclinic
         image: xpuska/petclinic:latest
         ports:
         - containerPort: 8080
         volumeMounts:
-        - name: logs-pvc
+        - name: logs
           mountPath: /opt/tomcat/logs
-  volumeClaimTemplates:
-  - metadata:
-      name: logs-pvc
-      annotations:
-        volume.beta.kubernetes.io/storage-class: local-storage
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 2Gi
+      # - name: filebeat
+      #   image: docker.elastic.co/beats/filebeat:7.0.0
+      #   volumeMounts:
+      #   - name: fl-config
+      #     mountPath: /usr/share/filebeat/filebeat.yml
+      #     subPath: filebeat.yml
+      #   - name: logs
+      #     mountPath: /var/log/tomcat
+      volumes:
+      - name: logs
+        persistentVolumeClaim:
+          claimName: myclaim
+# ---
+# apiVersion: apps/v1
+# kind: StatefulSet
+# metadata:
+#   name: petclinic
+#   labels:
+#     app: petclinic
+# spec:
+#   selector:
+#     matchLabels:
+#       app: petclinic
+#   serviceName: petclinic
+#   replicas: 4
+#   template:
+#     metadata:
+#       labels:
+#         app: petclinic
+#     spec:
+#       initContainers:
+#         - name: check-connection
+#           image: busybox
+#           command: ['sh', '-c', 'until nc -z -v -w30 petclinic-database 3306; do echo Waiting for mysql to be ready; sleep 5; done;']
+#         - name: volume-mount-hack
+#           image: busybox
+#           imagePullPolicy: IfNotPresent
+#           command: ["sh", "-c", "chmod 777 /var/log/tomcat"]
+#           volumeMounts:
+#           - name: logs-pvc
+#             mountPath: /var/log/tomcat
+#       containers:
+#       - name: petclinic
+#         image: xpuska/petclinic:latest
+#         ports:
+#         - containerPort: 8080
+#         volumeMounts:
+#         - name: logs-pvc
+#           mountPath: /opt/tomcat/logs
+#   volumeClaimTemplates:
+#   - metadata:
+#       name: logs-pvc
+#       annotations:
+#         volume.beta.kubernetes.io/storage-class: local-storage
+#     spec:
+#       accessModes: ["ReadWriteOnce"]
+#       resources:
+#         requests:
+#           storage: 2Gi
 ---
 kind: Service
 apiVersion: v1
