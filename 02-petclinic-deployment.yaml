@@ -19,8 +19,8 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: myclaim
-  app:
-    petclinic
+  labels:
+    app: petclinic
 spec:
   accessModes:
     - ReadWriteMany
@@ -28,8 +28,6 @@ spec:
   resources:
     requests:
       storage: 8Gi
-  selector:
-    name: petclinic-pv
 ---
 apiVersion: v1
 kind: ConfigMap
